@@ -1,4 +1,4 @@
-The DataDecomposition.jl.jl package is licensed under the MIT "Expat" License:
+The DataDecomposition.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2015: Tim Thatcher.
 >

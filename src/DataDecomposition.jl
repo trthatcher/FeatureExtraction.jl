@@ -1,4 +1,4 @@
-module DataDecomposition.jl
+module DataDecomposition
 
 # package code goes here
 
