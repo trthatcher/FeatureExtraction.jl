@@ -68,39 +68,109 @@ for (syevd, elty) in
 end
 
 
-
-
-# Assumes X is one observation per row
-# tol <= 0.0 trims nothing
-function data_svd!{T<:FloatingPoint}(X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
+function data_svd!{T<:FloatingPoint}(X::Matrix{T})
     _U, D, Vᵀ = LAPACK.gesdd!('S', X)
-    d = 0
-    @inbounds @simd for i = 1:length(D)
-        if D[i] >= tol
-            d += 1
-            D[i] = D[i]^2
-        else
-            break
-        end
-    end
-    (transpose(Vᵀ[1:d,:]), D[1:d])
+    (transpose(Vᵀ), d)
 end
 
-function cov_eig!{T<:FloatingPoint}(Σ::Matrix{T}, tol::T = eps(T)*maximum(size(Σ))*maximum(Σ))
+function data_eig!{T<:FloatingPoint}(Σ::Matrix{T}, tol::T = eps(T)*maximum(size(Σ))*maximum(Σ))
     Λ, V = LAPACK.syev!('V', 'U', Σ)  # V*diag(λ)*Vᵀ = Σ
-    n = length(Λ)
-    d = 0
-    @inbounds for i = n:-1:1
-        if Λ[i] >= tol
-            d += 1
-        end
-    end
-    (V[:,n:-1:(n-d+1)], Λ[n:-1:(n-d+1)])
+    (V, Λ[length(Λ):-1:1])
 end
 
 
 # Assumes X is one observation per row
 # Assumes M is one mean per row
+
+function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
+    (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
+    n = size(X, 1)
+    (m = size(M, 1)) <= n || throw(ArgumentError("M must have fewer rows than X."))
+    _U, _W, Q, Dm, Dx, k, l, R = LAPACK.ggsvd!('N', 'N', 'Q', M, X)  # UᵀMQ = Σ₁[0 R], WᵀXQ = Σ₂[0 R]
+    k == 0 || error("Generalised SVD failed because range(M) is not a subset of range(X)")
+    D = Array(T, l)
+    for i = 1:l
+        D[i] = Dm[i] / Dx[i]
+    end
+    σ = sortperm(D, alg = QuickSort, rev = true)
+    D = D[σ]  # Sort eigenvalues
+    LAPACK.trtri!('U', 'N', R)  # Invert R
+    if tol <= 0
+        error("not written")
+    else
+        d = 0
+        for i = 1:l
+            if D[i] >= tol
+                d += 1
+            else
+                break
+            end
+        end
+        if d < l
+            D = D[1:d]
+        end
+        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
+    end
+
+    if tol <= 0
+        D = Array(T, p)
+        if l < p
+            for i = 1:l
+                D[i] = Dm[i] / Dx[i]
+            end
+            for i = (l+1):p
+                D[i] = zero(T)
+            end
+        else
+            for i = 1:p
+                D[i] = Dm[i] / Dx[i]
+            end
+        end
+        σ = sortperm(D, alg = QuickSort, rev = true)
+        D = D[σ]    # sort eigenvalues
+        LAPACK.trtri!('U', 'N', R)  # Invert R
+        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
+        scale!(V, 1 ./ Dx[σ[1:l]])   # Normalize rows to ensure Σx orthogonality
+        return (V, D)
+    else
+        error("whoops")
+    end
+end
+
+#=
+function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
+    (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
+    n = size(X, 1)
+    (m = size(M, 1)) <= n || throw(ArgumentError("M must have fewer rows than X."))
+    _U, _W, Q, Dm, Dx, k, l, R = LAPACK.ggsvd!('N', 'N', 'Q', M, X)  # UᵀMQ = Σ₁[0 R], WᵀXQ = Σ₂[0 R]
+    k == 0 || error("Generalised SVD failed because range(M) is not a subset of range(X)")  # M must have been computed incorrectly or FP precision...
+    if tol <= 0
+        D = Array(T, p)
+        if l < p
+            for i = 1:l
+                D[i] = Dm[i] / Dx[i]
+            end
+            for i = (l+1):p
+                D[i] = zero(T)
+            end
+        else
+            for i = 1:p
+                D[i] = Dm[i] / Dx[i]
+            end
+        end
+        σ = sortperm(D, alg = QuickSort, rev = true)
+        D = D[σ]    # sort eigenvalues
+        LAPACK.trtri!('U', 'N', R)  # Invert R
+        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
+        scale!(V, 1 ./ Dx[σ[1:l]])   # Normalize rows to ensure Σx orthogonality
+        return (V, D)
+    else
+        error("whoops")
+    end
+end
+=#
+
+#=
 function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
     (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
     n = size(X, 1)
@@ -120,6 +190,7 @@ function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T
     scale!(V, 1 ./ Dx[σ])   # Normalize rows to ensure Σx orthogonality
     (V, Λ)
 end
+=#
 
 
 function cov_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tol::T = eps(T)*maximum(size(S_x))*maximum(S_x))
@@ -136,23 +207,10 @@ function cov_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tol::T = ep
     (V[:,n:-1:(n-d+1)], Λ[n:-1:(n-d+1)])
 end
 
-function sqrt_matrix!{T<:FloatingPoint}(S::Matrix{T}, tol::T = eps(T)*maximum(size(S))*maximum(S))
-    (p = size(S, 1)) == size(S, 2) || throw(DimensionMismatch("Symmetric matrix must be square."))
-    Λ, V = LAPACK.syev!('V', 'U', S)  # VΛVᵀ = S
-    @inbounds for i = 1:p
-        if abs(Λ[i]) < tol
-            error("Matrix must be of full rank to compute square root.")
-        end
-        Λ[i] = sqrt(sqrt(Λ[i]))  # fourth root
-    end
-    scale!(V, Λ)
-    syml!(BLAS.syrk('U', 'N', one(T), V))
-end
-
-function data_wsvd!{T<:FloatingPoint}(X::Matrix{T}, W_u::Matrix{T}, W_v::Matrix{T})
-    (n = size(X, 1)) == size(W_u, 1) == size(W_u, 2) || throw(DimensionMismatch("The order of W_u must match the number of rows of X."))
-    (m = size(X, 2)) == size(W_v, 1) == size(W_v, 2) || throw(DimensionMismatch("The order of W_v must match the number of columns of X."))
-    S_u = sqrt_matrix!(W_u)
-    S_v = sqrt_matrix!(W_v)
+function wsvd!{T<:FloatingPoint}(X::Matrix{T}, Wu::Matrix{T}, Wv::Matrix{T})
+    (n = size(X, 1)) == size(Wu, 1) == size(Wu, 2) || throw(DimensionMismatch("The order of Wu must match the number of rows of X."))
+    (m = size(X, 2)) == size(Wv, 1) == size(Wv, 2) || throw(DimensionMismatch("The order of Wv must match the number of columns of X."))
+    Λu, Qu = LAPACK.syev!('V', 'U', Wu)  # QΛQᵀ = Wu
+    Λv, Qv = LAPACK.syev!('V', 'U', Wv)  # QΛQᵀ = Wv
     U, D, Vᵀ = LAPACK.gesdd!('S', S_u * X * S_v)
 end
