@@ -70,127 +70,82 @@ end
 
 function data_svd!{T<:FloatingPoint}(X::Matrix{T})
     _U, D, Vᵀ = LAPACK.gesdd!('S', X)
-    (transpose(Vᵀ), d)
+    (transpose(Vᵀ), D)
 end
 
-function data_eig!{T<:FloatingPoint}(Σ::Matrix{T}, tol::T = eps(T)*maximum(size(Σ))*maximum(Σ))
-    Λ, V = LAPACK.syev!('V', 'U', Σ)  # V*diag(λ)*Vᵀ = Σ
-    (V, Λ[length(Λ):-1:1])
-end
-
-
-# Assumes X is one observation per row
-# Assumes M is one mean per row
-
-function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
-    (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
-    n = size(X, 1)
-    (m = size(M, 1)) <= n || throw(ArgumentError("M must have fewer rows than X."))
-    _U, _W, Q, Dm, Dx, k, l, R = LAPACK.ggsvd!('N', 'N', 'Q', M, X)  # UᵀMQ = Σ₁[0 R], WᵀXQ = Σ₂[0 R]
-    k == 0 || error("Generalised SVD failed because range(M) is not a subset of range(X)")
-    D = Array(T, l)
-    for i = 1:l
-        D[i] = Dm[i] / Dx[i]
-    end
-    σ = sortperm(D, alg = QuickSort, rev = true)
-    D = D[σ]  # Sort eigenvalues
-    LAPACK.trtri!('U', 'N', R)  # Invert R
-    if tol <= 0
-        error("not written")
-    else
-        d = 0
-        for i = 1:l
-            if D[i] >= tol
-                d += 1
-            else
-                break
-            end
-        end
-        if d < l
-            D = D[1:d]
-        end
-        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
-    end
-
-    if tol <= 0
-        D = Array(T, p)
-        if l < p
-            for i = 1:l
-                D[i] = Dm[i] / Dx[i]
-            end
-            for i = (l+1):p
-                D[i] = zero(T)
-            end
+function data_svd!{T<:FloatingPoint}(X::Matrix{T}, tol::T)
+    _U, D, Vᵀ = LAPACK.gesdd!('S', X)
+    d = 0
+    @inbounds for i = 1:length(D)
+        if D[i] > tol
+            d += 1
         else
-            for i = 1:p
-                D[i] = Dm[i] / Dx[i]
-            end
+            break
         end
-        σ = sortperm(D, alg = QuickSort, rev = true)
-        D = D[σ]    # sort eigenvalues
-        LAPACK.trtri!('U', 'N', R)  # Invert R
-        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
-        scale!(V, 1 ./ Dx[σ[1:l]])   # Normalize rows to ensure Σx orthogonality
-        return (V, D)
+    end
+    m = size(Vᵀ, 1)
+    if d < m
+        V = Array(T, m, d)
+        for j = 1:d, i = 1:m
+            V[i,j] = Vᵀ[j,i]
+        end
+        return (V, D[1:d])
     else
-        error("whoops")
+        return (transpose(Vᵀ), D)
     end
 end
 
-#=
-function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
-    (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
-    n = size(X, 1)
-    (m = size(M, 1)) <= n || throw(ArgumentError("M must have fewer rows than X."))
-    _U, _W, Q, Dm, Dx, k, l, R = LAPACK.ggsvd!('N', 'N', 'Q', M, X)  # UᵀMQ = Σ₁[0 R], WᵀXQ = Σ₂[0 R]
-    k == 0 || error("Generalised SVD failed because range(M) is not a subset of range(X)")  # M must have been computed incorrectly or FP precision...
-    if tol <= 0
-        D = Array(T, p)
-        if l < p
-            for i = 1:l
-                D[i] = Dm[i] / Dx[i]
-            end
-            for i = (l+1):p
-                D[i] = zero(T)
-            end
+function data_svd!{T<:FloatingPoint}(X::Matrix{T}, d::Integer)
+    _U, D, Vᵀ = LAPACK.gesdd!('S', X)
+    m = size(Vᵀ, 1)
+    if d < m
+        V = Array(T, m, d)
+        for j = 1:d, i = 1:m
+            V[i,j] = Vᵀ[j,i]
+        end
+        return (V, D[1:d])
+    else
+        return (transpose(Vᵀ), D)
+    end
+end
+    
+function data_eig!{T<:FloatingPoint}(Σ::Matrix{T})
+    D, V = LAPACK.syev!('V', 'U', Σ)  # VDVᵀ = Σ
+    (V, D[length(D):-1:1])
+end
+
+function data_eig!{T<:FloatingPoint}(Σ::Matrix{T}, tol::T)
+    D, V = LAPACK.syev!('V', 'U', Σ)  # VDVᵀ = Σ
+    d = 0
+    @inbounds for i = 1:length(D)
+        if D[i] > tol
+            d += 1
         else
-            for i = 1:p
-                D[i] = Dm[i] / Dx[i]
-            end
+            break
         end
-        σ = sortperm(D, alg = QuickSort, rev = true)
-        D = D[σ]    # sort eigenvalues
-        LAPACK.trtri!('U', 'N', R)  # Invert R
-        V = BLAS.gemm('N', 'N', Q, l == p ? R[:,σ] : [zeros(T,p-l,l) ; R[:,σ[1:l]]])
-        scale!(V, 1 ./ Dx[σ[1:l]])   # Normalize rows to ensure Σx orthogonality
-        return (V, D)
+    end
+    p = length(D)
+    if p < d
+        σ = p:-1:(p-d+1)
+        return (V[:,σ], D[σ])
     else
-        error("whoops")
+        return (V, D)
     end
 end
-=#
 
-#=
-function data_gsvd!{T<:FloatingPoint}(M::Matrix{T}, X::Matrix{T}, tol::T = eps(T)*maximum(size(X))*maximum(X))
-    (p = size(X,2)) == size(M, 2) || throw(ArgumentError("X and M must have the same number of columns."))
-    n = size(X, 1)
-    (m = size(M, 1)) <= n || throw(ArgumentError("M must have fewer rows than X."))
-    _U, _W, Q, Dm, Dx, k, l, R = LAPACK.ggsvd!('N', 'N', 'Q', M, X)  # UᵀMQ = Σ₁[0 R], WᵀXQ = Σ₂[0 R]
-    k == 0 || error("Generalised SVD failed because range(M) is not a subset of range(X)")  # M must have been computed incorrectly or FP precision...
-    d = min(l, m)  # Trim the trivial eigenvalues
-    Λ = Array(T, d)
-    @inbounds @simd for i = 1:d
-        Λ[i] = (Dm[i] / Dx[i])^2
+function data_eig!{T<:FloatingPoint}(Σ::Matrix{T}, d::Integer)
+    D, V = LAPACK.syev!('V', 'U', Σ)  # VDVᵀ = Σ
+    p = length(D)
+    if p < d
+        σ = p:-1:(p-d+1)
+        return (V[:,σ], D[σ])
+    else
+        return (V, D)
     end
-    σ = sortperm(Λ, alg = QuickSort, rev = true)
-    Λ = Λ[σ]    # Trim the zero eigenvalues
-    r = size(R, 1)
-    LAPACK.trtri!('U', 'N', R)  # Invert R
-    V = BLAS.gemm('N', 'N', Q, r == p ? R[:,σ] : [zeros(T,p-r,d) ; R[:,σ]])
-    scale!(V, 1 ./ Dx[σ])   # Normalize rows to ensure Σx orthogonality
-    (V, Λ)
 end
-=#
+
+
+
 
 
 function cov_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tol::T = eps(T)*maximum(size(S_x))*maximum(S_x))
