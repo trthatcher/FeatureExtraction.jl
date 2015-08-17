@@ -123,4 +123,15 @@ function translate!{T<:FloatingPoint}(A::Array{T}, b::T)
 end
 translate!{T<:FloatingPoint}(b::T, A::Array{T}) = translate!(A, b)
 
+function count_nonzero(v::Vector{T}, tol::T)
+    d = 0
+    @inbounds for i = 1:length(D)
+        if D[i] > tol
+            d += 1
+        else
+            break
+        end
+    end
+    d
+end
 
