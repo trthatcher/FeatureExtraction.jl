@@ -7,29 +7,27 @@
 ==========================================================================#
 
 immutable ParametersPCA{T<:FloatingPoint}
-    alg::Symbol
-    n::Int64  # Observation count
-    p::Int64  # Original number of parameters
+    algorithm::Symbol
     alpha::T  # Regularization parameter for covariance matrix
     epsilon::T   # Perturbation parameter for covariance matrix
     mu::Vector{T}
     tolerance::T
-    max_components::Int64
-    function ParametersPCA(alg::Symbol, n::Int64, p::Int64, α::T, ϵ::T, μ::Vector{T}, tol::T, max_comp::Int64)
-        n > 0 || throw(ArgumentError("n = $(n) must be positive a positive integer."))
-        p > 0 || throw(ArgumentError("p = $(p) must be positive a positive integer."))
+    max_dimension::Int64
+    function ParametersPCA(algorithm::Symbol, α::T, ϵ::T, μ::Vector{T}, tolerance::T, max_dimension::Int64)
         ϵ >= 0 || throw(ArgumentError("ϵ = $(ϵ) must be a non-negative number."))
         0 <= α <= 1 || throw(ArgumentError("α = $(α) must be in the inverval [0,1]."))
-        tol >= 0 || throw(ArgumentError("tol = $(tol) must be a non-negative number."))
-        max_comp >= 1 || throw(ArgumentError("Must select at least one component."))
-        new(alg, n, p, α, ϵ, μ, tol, max_components)
+        length(μ) == p || length(μ) == 0 || throw(ArgumentError("Mean vector must be length p = $(p) or p = 0."))
+        tolerance >= 0 || throw(ArgumentError("tol = $(tol) must be a non-negative number."))
+        max_dimension >= 1 || throw(ArgumentError("Must select at least one component."))
+        max_dimension <= p || throw(ArgumentError("Max dimension must not exceed p = $(p)."))
+        new(algorithm, n, p, α, ϵ, μ, tolerance, max_dimension)
     end
 end
 ParametersPCA{T<:FloatingPoint}(n::Int64, p::Int64, α::T, ϵ::T, tol::T, max_comp::Int64) = ParametersPCA{T}(n, p, α, ϵ, tol, max_comp)
 
 immutable ComponentsPCA{T<:FloatingPoint}
     V::Matrix{T}
-    d::Int64
+    D::Vector{T}
 end
 ComponentsPCA{T<:FloatingPoint}(μ::Vector{T}, V::Matrix{T}, d::Int64) = ComponentsPCA{T}(μ, V, d)
 
@@ -43,71 +41,50 @@ end
   Computational Routines
 ===================================================================================================#
 
-function center_data!(X::Matrix{T})
-    μ = mean(X, 1)
-    H = X .- μ
-    (μ, H)
+
+function pca_eig!{T<:FloatingPoint}(Σ::Matrix{T}, parameters::ParametersPCA{T})
+    parameters.α == 0 || regularize!(Σ, parameters.α)
+    parameters.ϵ == 0 || perturb!(Σ, parameters.ϵ)
+    components_eig!(Σ, parameters.tolerance, parameters.max_dimension)
 end
 
-
-
-function apply_transform!{T<:FloatingPoint}(Σ::Matrix{T}, param::ParametersPCA{T})
-    if param.α != 0
-        regularize!(Σ, param.α)
-    end
-    if param.ϵ != 0
-        perturb!(Σ, param.ϵ)
-    end
-    Σ
-end
-
-function pca_svd!(H::Matrix{T}, tol::T)
-    data_svd!(H, tol)
-end
-
-pca_svd!(H::Matrix{T})
-    
-
-
-function pca_data!{T<:FloatingPoint}(X::Matrix{T}, param::ParametersPCA{T}, μ::Vector{T} = vec(mean(X,1)))
-    H = length(μ) == 0 ? X : X .- μ'
-    if param.alg == :svd
-
-    H = X .- μ
-
+pca_svd!(H::Matrix{T}, param::ParametersPCA{T} = components_svd!(H, parameters.tolerance, parameters.max_dimension)
 
 # IS the matrix a covariance matrix?
 # What is the extraction method?
 # Components or tolerance
 
-function pca_cov!{T<:FloatingPoint}(Σ::Matrix{T}, param::ParametersPCA{T})
-    if method
-
-function pca!{T<:FloatingPoint}(X::Matrix{T}, param::ParametersPCA{T}, algorithm::Symbol, is_cov::Bool)
+function pca!{T<:FloatingPoint}(
+        X::Matrix{T},
+        algorithm::Symbol = :auto,
+        α::T = zero(T),
+        ϵ::T = zero(T),
+        μ::Vector{T} = vec(mean(X,1))
+        tolerance::Union(T,Symbol) = :auto,
+        max_dimension::Union(Int64,Symbol) = :auto
+    )
+    n = size(X,1)
+    p = size(X,2)
+    length(μ) == p || length(μ) == 0 || throw(DimensionMismatch("Mean vector must be of dimension zero or p."))
+    H = length(μ) == 0 ? X : translate!(X, μ)
+    if algorithm == :auto
+        algorithm = ϵ == 0 && α == 0 ? :svd : :eig
+    end
+    tol = isa(tolerance, T) ? tolerance : eps(T) * maximum(size(H)) * maximum(H)
+    max_dim = isa(max_dimension, Int64) ? max_dimension : p
+    β = 1/(n - one(T))  # Scaling constant for Σ = H'H/√(n-1)
+    params = ParametersPCA(algorithm, α, ϵ, μ, tol, max_dim)
     if algorithm == :svd
-        μ, H = center_data!(X)
-        if 
-
+        scale!(H, sqrt(β))  
+        V, D = pca_svd!(H, params)
+        return ModelPCA(params, ComponentsPCA(V, D))
     elseif algorithm == :eig
-
+        Σ = BLAS.syrk('U', 'T', β, H)
+        V, D = pca_eig!(Σ, params)
+        return ModelPCA(params, ComponentsPCA(V, D))
     else 
-        error("")
+        error("Unrecognized algorithm.")
     end
-
-    μ = mean(X, 1)
-    H = X .- μ
-    if (override == 0 && param.α == param.ϵ == 0)
-        scale!(H, one(T)/sqrt(param.n - one(T)))
-        tol = eps(T) * maximum(size(H)) * maximum(H)
-        VD = data_eigfact!(H, tol)
-    else
-        tol = eps(T) * maximum(size(H)) * maximum(H)
-		Σ = BLAS.syrk('U', 'T', one(T) / d, H)  # Σ = H'H/d
-		Model.α == 0 || regularize!(Σ, Model.α)
-		Model.ϵ == 0 || perturb!(Σ, Model.ϵ)
-		VD = cov_eigfact!(Σ, tol)
-    end
-    VD
 end
 
 

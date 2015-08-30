@@ -67,18 +67,9 @@ for (syevd, elty) in
     end
 end
 
-
-
-
-function data_svd!{T<:FloatingPoint}(X::Matrix{T})
+function components_svd!{T<:FloatingPoint}(X::Matrix{T}, tolerance::T, max_dimension::Integer)
     _U, D, Vᵀ = LAPACK.gesdd!('S', X)
-    (transpose(Vᵀ), D)
-end
-
-
-function data_svd!{T<:FloatingPoint}(X::Matrix{T}, tol::T, max_dim::Integer)
-    _U, D, Vᵀ = LAPACK.gesdd!('S', X)
-    d = tol == 0 ? max_dim : max(count_nonzero(D, tol), max_dim)
+    d = tolerance == 0 ? max_dimension : max(count_nonzero(D, tolerance), max_dimension)
     m = length(D)
     if d < m
         V = Array(T, m, d)
@@ -92,69 +83,11 @@ function data_svd!{T<:FloatingPoint}(X::Matrix{T}, tol::T, max_dim::Integer)
 end
 
 
-# Eigen Functions
-
-function check_square(A::Matrix)
-    (p = size(A,1)) == size(A,2) || throw(DimensionMismatch("Matrix A must be square."))
-    p
-end
-
-function check_square(A::Matrix, B::Matrix)
-    (p1 = size(A,1)) == size(A,2) || throw(DimensionMismatch("Matrix A must be square."))
-    (p2 = size(B,1)) == size(B,2) || throw(DimensionMismatch("Matrix B must be square."))
-    p1 == p2 || throw(DimensionMismatch("Matrix A and B must be of the same order."))
-    p1
-end
-
-#=
-function extract_eigenvectors!(V::Matrix{T}, D::Vector{T}, tol::T)
-    p = check_square(V)
-    d = 0
-    @inbounds for i = 1:p
-        if D[i] > tol
-            d += 1
-        else
-            break
-        end
-    end
-    if d < p
-        σ = p:-1:(p-d+1)
-        return (V[:,σ], D[σ])
-    else
-        return (V, D)
-    end
-=#
-
     
-function data_eig!{T<:FloatingPoint}(S::Matrix{T})
-    p = check_square(S)
+function components_eig!{T<:FloatingPoint}(S::Matrix{T}, tolerance::T, max_dimension::Integer)
+    (p = size(A,1)) == size(A,2) || throw(DimensionMismatch("Matrix A must be square."))
     D, V = LAPACK.syev!('V', 'U', S)  # VDVᵀ = S
-    (V, D[p:-1:1])
-end
-
-function data_eig!{T<:FloatingPoint}(S::Matrix{T}, tol::T = eps(T)*maximum(size(S))*maximum(S))
-    p = check_square(S)
-    D, V = LAPACK.syev!('V', 'U', S)  # VDVᵀ = S
-    d = 0
-    @inbounds for i = 1:p
-        if D[i] > tol
-            d += 1
-        else
-            break
-        end
-    end
-    if p < d
-        σ = p:-1:(p-d+1)
-        return (V[:,σ], D[σ])
-    else
-        return (V, D)
-    end
-end
-
-function data_eig!{T<:FloatingPoint}(S::Matrix{T}, d::Integer)
-    (p = size(S,1)) == size(S,2) || throw(DimensionMismatch("Matrix S must be square."))
-    0 < d <= p || throw(ArgumentError("Number of components extracted must in the range of (1,p)"))
-    D, V = LAPACK.syev!('V', 'U', S)  # VDVᵀ = S
+    d = tol == 0 ? max_dimension : max(count_nonzero(D, tolerance), max_dimension)
     if d < p
         σ = p:-1:(p-d+1)
         return (V[:,σ], D[σ])
@@ -163,44 +96,16 @@ function data_eig!{T<:FloatingPoint}(S::Matrix{T}, d::Integer)
     end
 end
 
-function data_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T})
-    (p = size(S_x, 1)) == size(S_x, 2) || throw(DimensionMismatch("Covariance matrix for X must be square."))
-    size(S_m, 2) == size(S_m, 2) || throw(DimensionMismatch("Covariance matrix for M must be square."))
-    p == size(S_m, 2) || throw(DimensionMismatch("Covariance matrices for X and M must be of the same order."))
-    Λ, V, _U = LAPACK.sygvd!(1, 'V', 'U', S_m, S_x)
-    (V[:,n:-1:1], Λ[n:-1:1])
-end
 
 #tol::T = eps(T)*maximum(size(S_x))*maximum(S_x)
-function cov_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tol::T = eps(T)*maximum(size(S_x))*maximum(S_x))
+function components_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tolerance::T, max_dimension::Integer)
     (p = size(S_x, 1)) == size(S_x, 2) || throw(DimensionMismatch("Covariance matrix for X must be square."))
     size(S_m, 2) == size(S_m, 2) || throw(DimensionMismatch("Covariance matrix for M must be square."))
     p == size(S_m, 2) || throw(DimensionMismatch("Covariance matrices for X and M must be of the same order."))
-    Λ, V, _U = LAPACK.sygvd!(1, 'V', 'U', S_m, S_x)
-    d = 0
-    @inbounds for i = n:-1:1
-        if Λ[i] >= tol
-            d += 1
-        end
-    end
+    D, V, _U = LAPACK.sygvd!(1, 'V', 'U', S_m, S_x)
+    d = tol == 0 ? max_dimension : max(count_nonzero(D, tolerance), max_dimension)
     (V[:,n:-1:(n-d+1)], Λ[n:-1:(n-d+1)])
 end
-
-#tol::T = eps(T)*maximum(size(S_x))*maximum(S_x)
-function cov_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, d::Integer)
-    (p = size(S_x, 1)) == size(S_x, 2) || throw(DimensionMismatch("Covariance matrix for X must be square."))
-    size(S_m, 2) == size(S_m, 2) || throw(DimensionMismatch("Covariance matrix for M must be square."))
-    p == size(S_m, 2) || throw(DimensionMismatch("Covariance matrices for X and M must be of the same order."))
-    Λ, V, _U = LAPACK.sygvd!(1, 'V', 'U', S_m, S_x)
-    d = 0
-    @inbounds for i = n:-1:1
-        if Λ[i] >= tol
-            d += 1
-        end
-    end
-    (V[:,n:-1:(n-d+1)], Λ[n:-1:(n-d+1)])
-end
-
 
 
 function wsvd!{T<:FloatingPoint}(X::Matrix{T}, Wu::Matrix{T}, Wv::Matrix{T})
