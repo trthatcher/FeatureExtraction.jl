@@ -2,6 +2,8 @@
   Principal Components Analysis
 ===================================================================================================#
 
+using MLKernels
+
 #==========================================================================
   PCA Objects
 ==========================================================================#
@@ -36,6 +38,13 @@ immutable ModelPCA{T<:FloatingPoint}
 	components::ComponentsPCA{T}
 end
 
+immutable ModelKPCA{T<:FloatingPoint}
+    kernel::Kernel{T}
+	parameters::ParametersPCA{T}
+	components::ComponentsPCA{T}
+end
+
+
 
 #===================================================================================================
   Computational Routines
@@ -66,7 +75,7 @@ function pca!{T<:FloatingPoint}(
     n = size(X,1)
     p = size(X,2)
     length(μ) == p || length(μ) == 0 || throw(DimensionMismatch("Mean vector must be of dimension zero or p."))
-    H = length(μ) == 0 ? X : translate!(X, μ)
+    H = length(μ) == 0 ? X : translate!(X, -μ)
     if algorithm == :auto
         algorithm = ϵ == 0 && α == 0 ? :svd : :eig
     end
@@ -86,6 +95,35 @@ function pca!{T<:FloatingPoint}(
         error("Unrecognized algorithm.")
     end
 end
+
+function kpca!{T<:FloatingPoint}(
+        K::Matrix{T},
+        algorithm::Symbol = :auto,
+        α::T = zero(T),
+        ϵ::T = zero(T),
+        tolerance::Union(T,Symbol) = :auto,
+        max_dimension::Union(Int64,Symbol) = :auto
+    )
+    (n = size(K,1)) == size(K,2) || throw(DimensionMismatch("Kernel matrix must be square."))
+    μ = vec(mean(K,1))
+    translate!(K, -μ)
+    tol = isa(tolerance, T) ? tolerance : eps(T) * maximum(size(H)) * maximum(H)
+    max_dim = isa(max_dimension, Int64) ? max_dimension : n
+    β = 1/(n - one(T))  # Scaling constant for Σ = H'H/√(n-1)
+    params = ParametersPCA(algorithm, α, ϵ, μ, tol, max_dim)
+    if algorithm == :svd
+        scale!(H, sqrt(β))  
+        V, D = pca_svd!(H, params)
+        return ModelPCA(params, ComponentsPCA(V, D))
+    elseif algorithm == :eig
+        Σ = BLAS.syrk('U', 'T', β, H)
+        V, D = pca_eig!(Σ, params)
+        return ModelPCA(params, ComponentsPCA(V, D))
+    else 
+        error("Unrecognized algorithm.")
+    end
+end
+
 
 
 #===================================================================================================
