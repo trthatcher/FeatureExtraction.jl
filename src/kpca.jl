@@ -8,7 +8,7 @@ using MLKernels
   PCA Objects
 ==========================================================================#
 
-immutable ParametersPCA{T<:FloatingPoint}
+immutable ParametersPCA{T<:AbstractFloat}
     algorithm::Symbol
     alpha::T  # Regularization parameter for covariance matrix
     epsilon::T   # Perturbation parameter for covariance matrix
@@ -25,20 +25,20 @@ immutable ParametersPCA{T<:FloatingPoint}
         new(algorithm, n, p, α, ϵ, μ, tolerance, max_dimension)
     end
 end
-ParametersPCA{T<:FloatingPoint}(n::Int64, p::Int64, α::T, ϵ::T, tol::T, max_comp::Int64) = ParametersPCA{T}(n, p, α, ϵ, tol, max_comp)
+ParametersPCA{T<:AbstractFloat}(n::Int64, p::Int64, α::T, ϵ::T, tol::T, max_comp::Int64) = ParametersPCA{T}(n, p, α, ϵ, tol, max_comp)
 
-immutable ComponentsPCA{T<:FloatingPoint}
+immutable ComponentsPCA{T<:AbstractFloat}
     V::Matrix{T}
     D::Vector{T}
 end
-ComponentsPCA{T<:FloatingPoint}(μ::Vector{T}, V::Matrix{T}, d::Int64) = ComponentsPCA{T}(μ, V, d)
+ComponentsPCA{T<:AbstractFloat}(μ::Vector{T}, V::Matrix{T}, d::Int64) = ComponentsPCA{T}(μ, V, d)
 
-immutable ModelPCA{T<:FloatingPoint}
+immutable ModelPCA{T<:AbstractFloat}
 	parameters::ParametersPCA{T}
 	components::ComponentsPCA{T}
 end
 
-immutable ModelKPCA{T<:FloatingPoint}
+immutable ModelKPCA{T<:AbstractFloat}
     kernel::Kernel{T}
 	parameters::ParametersPCA{T}
 	components::ComponentsPCA{T}
@@ -51,7 +51,7 @@ end
 ===================================================================================================#
 
 
-function pca_eig!{T<:FloatingPoint}(Σ::Matrix{T}, parameters::ParametersPCA{T})
+function pca_eig!{T<:AbstractFloat}(Σ::Matrix{T}, parameters::ParametersPCA{T})
     parameters.α == 0 || regularize!(Σ, parameters.α)
     parameters.ϵ == 0 || perturb!(Σ, parameters.ϵ)
     components_eig!(Σ, parameters.tolerance, parameters.max_dimension)
@@ -63,7 +63,7 @@ pca_svd!(H::Matrix{T}, param::ParametersPCA{T} = components_svd!(H, parameters.t
 # What is the extraction method?
 # Components or tolerance
 
-function pca!{T<:FloatingPoint}(
+function pca!{T<:AbstractFloat}(
         X::Matrix{T},
         algorithm::Symbol = :auto,
         α::T = zero(T),
@@ -96,7 +96,7 @@ function pca!{T<:FloatingPoint}(
     end
 end
 
-function kpca!{T<:FloatingPoint}(
+function kpca!{T<:AbstractFloat}(
         K::Matrix{T},
         algorithm::Symbol = :auto,
         α::T = zero(T),
@@ -130,7 +130,7 @@ end
   Interface
 ===================================================================================================#
 
-function pca{T<:FloatingPoint}(
+function pca{T<:AbstractFloat}(
         X::Matrix{T};
         alpha::T = zero(T),
         epsilon::T = zero(T),
@@ -144,7 +144,7 @@ end
 
 
 #=
-function kpca{T<:FloatingPoint}(
+function kpca{T<:AbstractFloat}(
 		X::Matrix{T}; 
 		kernel::KERNEL.MercerKernel=KERNEL.LinearKernel(),
 		dimensions::Integer=0, 

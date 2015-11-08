@@ -6,7 +6,7 @@
   LDA Objects
 ==========================================================================#
 
-immutable LDA_Parameters{T<:FloatingPoint}
+immutable LDA_Parameters{T<:AbstractFloat}
     n::Int64      # Observations
     p::Int64      # Dimensions
     k::Int64      # Number of classes
@@ -29,12 +29,12 @@ immutable LDA_Parameters{T<:FloatingPoint}
     end
 end
 
-function LDA_Parameters{T<:FloatingPoint}(n::Int64, p::Int64, k::Int64, f::Vector{T}, α::T, αₓ::T,
+function LDA_Parameters{T<:AbstractFloat}(n::Int64, p::Int64, k::Int64, f::Vector{T}, α::T, αₓ::T,
                                           ϵ::T, ϵₓ::T)
     LDA_Parameters{T}(n, p, k, f, α, αₓ, ϵ, ϵₓ)
 end
 
-immutable LDA_Model{T<:FloatingPoint}
+immutable LDA_Model{T<:AbstractFloat}
 	Parameters::LDA_Parameters{T}
 	Components::DataEigen{T}
 end
@@ -44,7 +44,7 @@ end
   Computational Routines
 ==========================================================================#
 
-function lda!{T<:FloatingPoint}(y::Factor, X::Matrix{T}, Model::LDA_Parameters{T},
+function lda!{T<:AbstractFloat}(y::Factor, X::Matrix{T}, Model::LDA_Parameters{T},
                                 override::Int64 = 0)
     M = class_means(y, X)  # M = [μ₁; μ₂; ...]
     Hₓ = center_rows!(y, X, M)
@@ -74,7 +74,7 @@ end
   Interface
 ===================================================================================================#
 
-function lda{T<:FloatingPoint}(
+function lda{T<:AbstractFloat}(
         y::Factor,
         X::Matrix{T};
         frequencies::Vector{T} = convert(Vector{T}, class_counts(y) ./ y.n),
@@ -91,7 +91,7 @@ end
 
 
 #=
-function klda{T₁<:Integer,T₂<:FloatingPoint}(
+function klda{T₁<:Integer,T₂<:AbstractFloat}(
 		y::Vector{T₁},
 		X::Matrix{T₂};
 		kernel::KERNEL.MercerKernel=KERNEL.LinearKernel(),
@@ -107,7 +107,7 @@ function klda{T₁<:Integer,T₂<:FloatingPoint}(
 	return KLDA_Model(Parameters,Components,copy(X),kernel)
 end
 
-function transform{T<:FloatingPoint}(Model::KLDA_Model{T},Z::Matrix{T})
+function transform{T<:AbstractFloat}(Model::KLDA_Model{T},Z::Matrix{T})
 	K = KERNEL.kernelmatrix(Z,Model.X,Model.κᵩ)
 	return BLAS.gemm('N','N', K, Model.Components.W)
 end

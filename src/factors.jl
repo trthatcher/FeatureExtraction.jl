@@ -30,7 +30,7 @@ immutable Factor
 end
 
 # Center X using the rows of M and index y[i]
-function center_rows!{T<:FloatingPoint}(y::Factor, X::Matrix{T}, M::Matrix{T})
+function center_rows!{T<:AbstractFloat}(y::Factor, X::Matrix{T}, M::Matrix{T})
     n, p = size(X)
     y.k == size(M,1) || throw(ArgumentError("M must have as many rows as classes."))
     idx = y.code
@@ -42,7 +42,7 @@ function center_rows!{T<:FloatingPoint}(y::Factor, X::Matrix{T}, M::Matrix{T})
     X
 end
 
-function class_sums{T<:FloatingPoint}(y::Factor, X::Matrix{T})
+function class_sums{T<:AbstractFloat}(y::Factor, X::Matrix{T})
     n, p = size(X)
     n == y.n || throw(ArgumentError("Factor y and matrix X must have the same number of rows"))
     M = zeros(T, y.k, p)
@@ -64,7 +64,7 @@ function class_counts(y::Factor)
     c
 end
 
-function class_means{T<:FloatingPoint}(y::Factor, X::Matrix{T})
+function class_means{T<:AbstractFloat}(y::Factor, X::Matrix{T})
     M::Matrix{T} = class_sums(y, X)
     c::Vector{Int64} = class_counts(y)
     dgmm!(one(T) ./ c, M)

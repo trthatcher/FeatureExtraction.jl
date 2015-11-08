@@ -67,7 +67,7 @@ for (syevd, elty) in
     end
 end
 
-function components_svd!{T<:FloatingPoint}(X::Matrix{T}, tolerance::T, max_dimension::Integer)
+function components_svd!{T<:AbstractFloat}(X::Matrix{T}, tolerance::T, max_dimension::Integer)
     _U, D, Vᵀ = LAPACK.gesdd!('S', X)
     d = tolerance == 0 ? max_dimension : max(count_nonzero(D, tolerance), max_dimension)
     m = length(D)
@@ -84,7 +84,7 @@ end
 
 
     
-function components_eig!{T<:FloatingPoint}(S::Matrix{T}, tolerance::T, max_dimension::Integer)
+function components_eig!{T<:AbstractFloat}(S::Matrix{T}, tolerance::T, max_dimension::Integer)
     (p = size(A,1)) == size(A,2) || throw(DimensionMismatch("Matrix A must be square."))
     D, V = LAPACK.syev!('V', 'U', S)  # VDVᵀ = S
     d = tol == 0 ? max_dimension : max(count_nonzero(D, tolerance), max_dimension)
@@ -98,7 +98,7 @@ end
 
 
 #tol::T = eps(T)*maximum(size(S_x))*maximum(S_x)
-function components_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tolerance::T, max_dimension::Integer)
+function components_geig!{T<:AbstractFloat}(S_m::Matrix{T}, S_x::Matrix{T}, tolerance::T, max_dimension::Integer)
     (p = size(S_x, 1)) == size(S_x, 2) || throw(DimensionMismatch("Covariance matrix for X must be square."))
     size(S_m, 2) == size(S_m, 2) || throw(DimensionMismatch("Covariance matrix for M must be square."))
     p == size(S_m, 2) || throw(DimensionMismatch("Covariance matrices for X and M must be of the same order."))
@@ -108,7 +108,7 @@ function components_geig!{T<:FloatingPoint}(S_m::Matrix{T}, S_x::Matrix{T}, tole
 end
 
 
-function wsvd!{T<:FloatingPoint}(X::Matrix{T}, Wu::Matrix{T}, Wv::Matrix{T})
+function wsvd!{T<:AbstractFloat}(X::Matrix{T}, Wu::Matrix{T}, Wv::Matrix{T})
     (n = size(X, 1)) == size(Wu, 1) == size(Wu, 2) || throw(DimensionMismatch("The order of Wu must match the number of rows of X."))
     (m = size(X, 2)) == size(Wv, 1) == size(Wv, 2) || throw(DimensionMismatch("The order of Wv must match the number of columns of X."))
     Λu, Qu = LAPACK.syev!('V', 'U', Wu)  # QΛQᵀ = Wu
