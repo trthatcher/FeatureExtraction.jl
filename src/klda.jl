@@ -1,60 +1,45 @@
-#===================================================================================================
-  Kernel Principal Components Analysis
-===================================================================================================#
-
 #==========================================================================
-  LDA Objects
+  LDA Solvers
 ==========================================================================#
 
-immutable LDA_Parameters{T<:AbstractFloat,U<:Integer}
-    n::U  # Observations
-    p::U  # Dimensions
-    k::U  # Number of classes
-    freq::Nullable{Vector{T}}  # Class frequencies
-    alpha_mu  ::Nullable{T}  # Regularization parameter for Σ_μ ∝ MᵀM
-    alpha_x   ::Nullable{T}  # Regularization parameter for Σ_x ∝ XᵀX
-    epsilon_mu::Nullable{T}  # Perturbation parameter for Σ_μ
-    epsilon_x ::Nullable{T}  # parameter for Σ_x
-    function LDA_Parameters(n::U, 
-                            p::U,
-                            k::U, 
-                            freq::Nullable{Vector{T}}, 
-                            α_μ::Nullable{T}, 
-                            α_x::Nullable{T}, 
-                            ϵ_μ::Nullable{T}, 
-                            ϵ_x::Nullable{T})
-        get(n) > 0 || error("n = $(n) must be positive a positive integer.")
-        p > 0 || error("p = $(p) must be positive a positive integer.")
-        k > 0 || error("k = $(k) must be positive a positive integer.")
-        #k == length(freq) || error("Class frequencies vector must have k = $(k) entries.")
-        if !isnull(ϵ_μ)
-            get(ϵ_μ) >= 0 || error("ϵ = $(get(ϵ_μ)) must be a non-negative number.")
-        end
-        ϵ_c >= 0 || error("ϵₓ = $(ϵ_x) must be a non-negative number.")
-        0 <= α_μ <= 1 || error("α = $(α_μ) must be in the inverval [0,1].")
-        0 <= α_x <= 1 || error("αₓ = $(α_x) must be in the inverval [0,1].")
-        new(n, p, k, freq, α_μ, α_x, ϵ_μ, ϵ_x)
+function class_counts{T<:Integer}(y::Vector{T}, k::T)
+    counts = zeros(Int64, k)
+    for i = 1:length(y)
+        i < k || error("Index out of range.")
+        counts[y[i]] += 1
     end
+    counts
 end
 
-#function LDA_Parameters{T<:AbstractFloat}(n::Int64, p::Int64, k::Int64, f::Vector{T}, α::T, αₓ::T,
-#                                          ϵ::T, ϵₓ::T)
-#    LDA_Parameters{T}(n, p, k, f, α, αₓ, ϵ, ϵₓ)
-#end
-
-immutable LDA_Model{T<:AbstractFloat}
-	Parameters::LDA_Parameters{T}
-	Components::DataEigen{T}
+function class_means{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U}, k::U = maximum(y))
+    n, p = size(X)
+    length(y) == n || throw(DimensionMismatch("X and y must have the same number of rows."))
+    scale_factor = one(T) ./ class_counts(y, k)
+    M = Array(T, k, p)
+    for j = 1:p, i = 1:n
+        M[y[i],j] += X[i,j]
+    end
+    scale!(M, scale_factor)
 end
 
+#function center_rows
 
-#==========================================================================
-  Computational Routines
-==========================================================================#
+# Takes intermediate matrices such that H_b'H_b = Σ_b, H_w'H_w = Σ_w
+# and returns (lda_components, eigenvalues)
+function lda_components!{T<:AbstractFloat}(H_b::Matrix{T}, α_b::T, ϵ_b::T, H_w::Matrix{T}, α_w::T, ϵ_w::T)
+    Σ_b = syml!(BLAS.syrk('U', 'T', one(T), H_b))  # Σ_b = H_b'*diag(freq)*H_b
+    α_b == 0 || regularize!(Σ_b, α_b)
+    ϵ_b == 0 || perturb!(Σ_b, ϵ_b)
+    #tol = eps(T) * maximum(size(H_w)) * maximum(H_w)
+    Σ_w = syml!(BLAS.syrk('U', 'T', one(T), H_w))  # Σₓ = Hₓ'Hₓ/d ∝ Hₓ'Hₓ
+    α_w == 0 || regularize!(Σ_w, α_w)
+    ϵ_w == 0 || perturb!(Σ_w, ϵ_w)
+    components_eig(Σ_b, Σ_b)
+end
 
-function lda!{T<:AbstractFloat}(y::Factor, X::Matrix{T}, Model::LDA_Parameters{T},
-                                override::Int64 = 0)
-    M = class_means(y, X)  # M = [μ₁; μ₂; ...]
+#=
+function lda!{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U})
+    M = class_means(X, y)  # M = [μ1; μ2; ...]
     Hₓ = center_rows!(y, X, M)
     μ = vec(BLAS.gemm('N', 'N', one(T), reshape(Model.f, 1, Model.k), M))  # μ = Σ fᵢ * μᵢ
     H = row_sub!(M, μ)  # Center M
@@ -76,12 +61,14 @@ function lda!{T<:AbstractFloat}(y::Factor, X::Matrix{T}, Model::LDA_Parameters{T
     end
     VΛ
 end
+=#
 
 
 #===================================================================================================
   Interface
 ===================================================================================================#
 
+#=
 function lda{T<:AbstractFloat}(
         y::Factor,
         X::Matrix{T};
@@ -97,6 +84,7 @@ function lda{T<:AbstractFloat}(
     LDA_Model(Parameters, Components)
 end
 
+=#
 
 #=
 function klda{T₁<:Integer,T₂<:AbstractFloat}(
