@@ -11,18 +11,23 @@ function class_counts{T<:Integer}(y::Vector{T}, k::T)
     counts
 end
 
-function class_means{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U}, k::U = maximum(y))
+function class_totals{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U}, k::U)
     n, p = size(X)
     length(y) == n || throw(DimensionMismatch("X and y must have the same number of rows."))
-    scale_factor = one(T) ./ class_counts(y, k)
-    M = Array(T, k, p)
+    M = zeros(T, k, p)
     for j = 1:p, i = 1:n
         M[y[i],j] += X[i,j]
     end
-    scale!(M, scale_factor)
+    M
 end
 
-#function center_rows
+function center_rows!{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, M::Matrix{T}, y::Vector{u})
+    n, p = size(X)
+    for j = 1:p, i = 1:n
+        X[i,j] -= M[y[i],j]
+    end
+    X
+end
 
 # Takes intermediate matrices such that H_b'H_b = Σ_b, H_w'H_w = Σ_w
 # and returns (lda_components, eigenvalues)
@@ -31,38 +36,23 @@ function lda_components!{T<:AbstractFloat}(H_b::Matrix{T}, α_b::T, ϵ_b::T, H_w
     α_b == 0 || regularize!(Σ_b, α_b)
     ϵ_b == 0 || perturb!(Σ_b, ϵ_b)
     #tol = eps(T) * maximum(size(H_w)) * maximum(H_w)
-    Σ_w = syml!(BLAS.syrk('U', 'T', one(T), H_w))  # Σₓ = Hₓ'Hₓ/d ∝ Hₓ'Hₓ
+    Σ_w = syml!(BLAS.syrk('U', 'T', one(T), H_w))  # Σ_w = H_w'H_w
     α_w == 0 || regularize!(Σ_w, α_w)
     ϵ_w == 0 || perturb!(Σ_w, ϵ_w)
     components_eig(Σ_b, Σ_b)
 end
 
-#=
-function lda!{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U})
-    M = class_means(X, y)  # M = [μ1; μ2; ...]
-    Hₓ = center_rows!(y, X, M)
-    μ = vec(BLAS.gemm('N', 'N', one(T), reshape(Model.f, 1, Model.k), M))  # μ = Σ fᵢ * μᵢ
-    H = row_sub!(M, μ)  # Center M
-    d = convert(T, Model.n - Model.k)  # d = (n - k) is the sampling correction for Σₓ
-    dgmm!(sqrt(Model.f), H)  # H := diag(√(f*d))*H
-    if override == 1
-        BLAS.scal!(length(Hₓ), one(T) / sqrt(d), Hₓ, 1)  # Hₓ := Hₓ/√d
-        tol = eps(T) * maximum(size(Hₓ)) * maximum(Hₓ)
-        VΛ = data_eigfact!(H, Hₓ, tol)
-    else
-        Σ = syml!(BLAS.syrk('U', 'T', one(T), H))  # Σ = H'*diag(f)*H (weighted covariance)
-        Model.α == 0 || regularize!(Σ, Model.α)
-        Model.ϵ == 0 || perturb!(Σ, Model.ϵ)
-        tol = eps(T) * maximum(size(Hₓ)) * maximum(Hₓ)
-        Σₓ = syml!(BLAS.syrk('U', 'T', one(T) / d, Hₓ))  # Σₓ = Hₓ'Hₓ/d ∝ Hₓ'Hₓ
-        Model.αₓ == 0 || regularize!(Σₓ, Model.αₓ)
-        Model.ϵₓ == 0 || perturb!(Σₓ, Model.ϵₓ)
-        VΛ = cov_eigfact!(Σ, Σₓ, tol)
-    end
-    VΛ
+function lda!{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, y::Vector{U}, k::U, frequency::Vector{T})
+    n, p = size(X)
+    M = class_totals(X, y, k)
+    scale!(one(T) ./ class_counts(y), M)
+    H_w = center_rows!(X, M, y)  # M = [μ1; μ2; ...]
+    scale!(H_w, one(T)/(n-k))  # sampling correction factor for Σ_w
+    μ = vec(frequency'M)
+    translate!(μ, M)  # M:= M .- μ'
+    H_b = scale!(sqrt(frequency), M)  # M := freq .* M (applies weights to class mean)
+    (H_b, H_m)
 end
-=#
-
 
 #===================================================================================================
   Interface
