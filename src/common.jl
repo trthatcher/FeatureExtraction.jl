@@ -158,7 +158,7 @@ end
 function components_eig!{T<:AbstractFloat}(S::Matrix{T})
     (p = size(A,1)) == size(A,2) || throw(DimensionMismatch("Matrix A must be square."))
     D, V = LAPACK.syev!('V', 'U', S)  # S = VDVᵀ
-    V, D[end:-1:1]
+    (V, D[end:-1:1])
 end
 
 #tol::T = eps(T)*maximum(size(S_x))*maximum(S_x)

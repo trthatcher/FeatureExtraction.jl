@@ -1,67 +1,29 @@
-#===================================================================================================
-  Principal Components Analysis
-===================================================================================================#
-
-using MLKernels
-
 #==========================================================================
-  PCA Objects
+  KPCA Solvers
 ==========================================================================#
 
-immutable ParametersPCA{T<:AbstractFloat}
-    algorithm::Symbol
-    alpha::T  # Regularization parameter for covariance matrix
-    epsilon::T   # Perturbation parameter for covariance matrix
-    mu::Vector{T}
-    tolerance::T
-    max_dimension::Int64
-    function ParametersPCA(algorithm::Symbol, α::T, ϵ::T, μ::Vector{T}, tolerance::T, max_dimension::Int64)
-        ϵ >= 0 || throw(ArgumentError("ϵ = $(ϵ) must be a non-negative number."))
-        0 <= α <= 1 || throw(ArgumentError("α = $(α) must be in the inverval [0,1]."))
-        length(μ) == p || length(μ) == 0 || throw(ArgumentError("Mean vector must be length p = $(p) or p = 0."))
-        tolerance >= 0 || throw(ArgumentError("tol = $(tol) must be a non-negative number."))
-        max_dimension >= 1 || throw(ArgumentError("Must select at least one component."))
-        max_dimension <= p || throw(ArgumentError("Max dimension must not exceed p = $(p)."))
-        new(algorithm, n, p, α, ϵ, μ, tolerance, max_dimension)
+function pca_components_eig!{T<:AbstractFloat}(H::Matrix{T}, α::T, ϵ::T)
+    Σ = syml!(BLAS.syrk('U', 'T', one(T), H_b))  # Σ = H'H
+    α == 0 || regularize!(Σ, α, trace(Σ)/size(Σ,1))
+    ϵ == 0 || perturb!(Σ, ϵ)
+    components_eig!(Σ)
+end
+
+pca_components_svd!(H::Matrix{T}) = components_svd!(H::Matrix{T})
+
+function pca!{T<:AbstractFloat}(X::Matrix{T}, α::T = zero(T), ϵ:: = zero(T))
+    n, p = size(H)
+    μ = mean(X,1)
+    H = translate!(X, μ)
+    scale!(H, one(T)/sqrt(n-1))  # Scaling constant
+    if α == 0 && ϵ == 0
+        return pca_components_svd!(H)
+    else
+        return pca_components_eig!(H, α, ϵ)
     end
 end
-ParametersPCA{T<:AbstractFloat}(n::Int64, p::Int64, α::T, ϵ::T, tol::T, max_comp::Int64) = ParametersPCA{T}(n, p, α, ϵ, tol, max_comp)
 
-immutable ComponentsPCA{T<:AbstractFloat}
-    V::Matrix{T}
-    D::Vector{T}
-end
-ComponentsPCA{T<:AbstractFloat}(μ::Vector{T}, V::Matrix{T}, d::Int64) = ComponentsPCA{T}(μ, V, d)
-
-immutable ModelPCA{T<:AbstractFloat}
-	parameters::ParametersPCA{T}
-	components::ComponentsPCA{T}
-end
-
-immutable ModelKPCA{T<:AbstractFloat}
-    kernel::Kernel{T}
-	parameters::ParametersPCA{T}
-	components::ComponentsPCA{T}
-end
-
-
-
-#===================================================================================================
-  Computational Routines
-===================================================================================================#
-
-
-function pca_eig!{T<:AbstractFloat}(Σ::Matrix{T}, parameters::ParametersPCA{T})
-    parameters.α == 0 || regularize!(Σ, parameters.α)
-    parameters.ϵ == 0 || perturb!(Σ, parameters.ϵ)
-    components_eig!(Σ, parameters.tolerance, parameters.max_dimension)
-end
-
-pca_svd!(H::Matrix{T}, param::ParametersPCA{T} = components_svd!(H, parameters.tolerance, parameters.max_dimension)
-
-# IS the matrix a covariance matrix?
-# What is the extraction method?
-# Components or tolerance
+#= 
 
 function pca!{T<:AbstractFloat}(
         X::Matrix{T},
@@ -124,11 +86,14 @@ function kpca!{T<:AbstractFloat}(
     end
 end
 
+=#
 
 
 #===================================================================================================
   Interface
 ===================================================================================================#
+
+#=
 
 function pca{T<:AbstractFloat}(
         X::Matrix{T};
@@ -141,7 +106,7 @@ function pca{T<:AbstractFloat}(
     Components = pca!(copy(X), Parameters, override)
     PCA_Model(Parameters, Components)
 end
-
+=#
 
 #=
 function kpca{T<:AbstractFloat}(

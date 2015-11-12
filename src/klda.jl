@@ -33,11 +33,11 @@ end
 # and returns (lda_components, eigenvalues)
 function lda_components!{T<:AbstractFloat}(H_b::Matrix{T}, α_b::T, ϵ_b::T, H_w::Matrix{T}, α_w::T, ϵ_w::T)
     Σ_b = syml!(BLAS.syrk('U', 'T', one(T), H_b))  # Σ_b = H_b'*diag(freq)*H_b
-    α_b == 0 || regularize!(Σ_b, α_b)
+    α_b == 0 || regularize!(Σ_b, α_b, trace(Σ_b)/size(Σ_b,1))
     ϵ_b == 0 || perturb!(Σ_b, ϵ_b)
     #tol = eps(T) * maximum(size(H_w)) * maximum(H_w)
     Σ_w = syml!(BLAS.syrk('U', 'T', one(T), H_w))  # Σ_w = H_w'H_w
-    α_w == 0 || regularize!(Σ_w, α_w)
+    α_w == 0 || regularize!(Σ_w, α_w, trace(Σ_w)/size(Σ_w,1))
     ϵ_w == 0 || perturb!(Σ_w, ϵ_w)
     components_geig!(Σ_b, Σ_b)
 end
