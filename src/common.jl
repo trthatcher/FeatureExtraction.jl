@@ -167,7 +167,7 @@ function components_geig!{T<:AbstractFloat}(S_m::Matrix{T}, S_x::Matrix{T})
     size(S_m, 2) == size(S_m, 2)       || throw(DimensionMismatch("Covariance matrix for M must be square."))
     p == size(S_m, 2)                  || throw(DimensionMismatch("Covariance matrices for X and M must be of the same order."))
     D, V, _U = LAPACK.sygvd!(1, 'V', 'U', S_m, S_x)
-    (V[:,end:-1:1], Λ[end:-1:1])
+    (V[:,end:-1:1], D[end:-1:1])
 end
 
 # MCA - WIP weighted svd
