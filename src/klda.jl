@@ -62,22 +62,10 @@ end
 
 # W is components returned
 # Z must be the new matrix to be transformed
-transform{T<:AbstractFloat}(W::Matrix{T}, Z::Matrix{T}) = Z * W
-
-#=
-function klda!{T<:AbstractFloat,U<:Integer}(X::Matrix{T}, κ::Kernel{T}, y::Vector{U}, k::U, frequency::Vector{T},
-                                           α_b::T = zero(T), ϵ_b::T = zero(T), α_w::T = zero(T), ϵ_w::T = zero(T))
-    H_b, H_w = lda_matrices!(kernelmatrix(κ, X), y, k, frequency)
-    lda_components!(H_b, α_b, ϵ_b, H_w, α_w, ϵ_w)
-end
-=#
+transform_lda{T<:AbstractFloat}(W::Matrix{T}, Z::Matrix{T}) = Z * W
 
 # X must be original data matrix
 # κ must be original kernel
 # W is components returned
 # Z must be the new matrix to be transformed
-#=
-function transform{T<:AbstractFloat}(X::Matrix{T}, κ::Kernel{T}, W::Matrix{T}, Z::Matrix{T})
-	kernelmatrix(Z, X) * W
-end
-=#
+transform_klda{T<:AbstractFloat}(X::Matrix{T}, κ::Kernel{T}, W::Matrix{T}, Z::Matrix{T}) = kernelmatrix(Z, X) * W
