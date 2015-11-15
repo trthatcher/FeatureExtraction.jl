@@ -160,7 +160,7 @@ end
 # Divide and conquer singular value decomposition
 function components_eig!{T<:AbstractFloat}(S::Matrix{T})
     (p = size(S,1)) == size(S,2) || throw(DimensionMismatch("Matrix A must be square."))
-    D, V = LAPACK.syev!('V', 'U', S)  # S = VDVᵀ
+    D, V = syevd!('V', 'U', S)  # S = VDVᵀ
     (V[:,end:-1:1], D[end:-1:1])
 end
 
