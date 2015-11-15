@@ -10,11 +10,9 @@ export lda_components!,
        transform_lda,
        klda!,
        transform_klda,
-       pca_components_eig!,
-       pca_components_svd!,
-       pca!,
+       pca,
        transform_pca,
-       kpca!,
+       kpca,
        transform_kpca
 
 include("common.jl")
