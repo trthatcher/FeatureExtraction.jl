@@ -18,7 +18,7 @@ function pca!{T<:AbstractFloat}(X::Matrix{T}, α::T = zero(T), ϵ::T = zero(T))
     n, p = size(X)
     μ = vec(mean(X,1))
     H = translate!(X, -μ)
-    V, Λ = (α == 0 && ϵ == 0) ? pca_components_svd!(H) : pca_components_eig!(H, α, ϵ)
+    V, Λ = (α == 0 && ϵ == 0) ? pca_components_svd!(H) : pca_components_eig!(H, α, ϵ*(n-1))
     (V, scale!(Λ, one(T)/(n-1)))  # Sampling correction of n-1
 end
 
@@ -62,7 +62,7 @@ Applies the kernel principal components `W` to `Z`. `X` and `κ` must be the
 original data matrix and kernel input into the solver.
 """
 function transform_kpca{T<:AbstractFloat}(X::Matrix{T}, κ::Kernel{T}, W::Matrix{T}, Z::Matrix{T})
-    K_zx = kernelmatrix(Z, X)
+    K_zx = kernelmatrix(κ, Z, X)
     μ_x = vec(mean(K_zx, 2))  # Need to center X in Hilbert space
     scale!(-μ, K_zx) * W
 end
