@@ -19,7 +19,7 @@ function pca!{T<:AbstractFloat}(X::Matrix{T}, α::T = zero(T), ϵ::T = zero(T))
     μ = vec(mean(X,1))
     H = translate!(X, -μ)
     V, Λ = (α == 0 && ϵ == 0) ? pca_components_svd!(H) : pca_components_eig!(H, α, ϵ)
-    (V, scale!(Λ, one(T)/(n-1)))  # Sampling correction
+    (V, scale!(Λ, one(T)/(n-1)))  # Sampling correction of n-1
 end
 
 doc"""
