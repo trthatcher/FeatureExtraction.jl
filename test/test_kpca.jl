@@ -39,14 +39,20 @@ for T in FloatingPointTypes
         D2, V2 = eig(MOD.perturb!(MOD.regularize!(copy(Σ), α, trace(Σ)/p), ϵ))
         @test_approx_eq abs(V1) abs(V2[:,end:-1:1])
         @test_approx_eq abs(D1) abs(D2[end:-1:1])
+        @test_approx_eq abs(transform_pca(V1,X)) abs(X*(V2[:,end:-1:1]))
     end
 end
 
-#=
-κ = PolynomialKernel(one(T),zero(T),one(T))  # Equivalent to dot product
-K = centerkernelmatrix!(kernelmatrix(κ, X))
-V1, D2 = pca(copy(X))
-V2, D2 = kpca(copy(X),κ)
-=#
-
-#@test_approx_eq diag(V'Xc'Xc*V)*(n-1) D
+info("Testing ", MOD.kpca)
+for T in FloatingPointTypes
+    X = rand(T, n, p)
+    Xc = X .- mean(X,1)
+    Σ = Xc'Xc/(n-1)
+    κ = PolynomialKernel(one(T),zero(T),one(T))  # Equivalent to dot product
+    for ϵ in (zero(T), one(T))
+        V1, D1 = MOD.kpca(copy(X), κ, zero(T), ϵ)
+        V2, D2 = MOD.pca(copy(X), zero(T), ϵ)
+        @test_approx_eq (V1'Xc*Xc'V1/(n-1))[1:p,1:p] (V2'Σ*V2)
+        @test_approx_eq abs(D1)[1:p] abs(D2)
+    end
+end

@@ -51,7 +51,7 @@ function kpca{T<:AbstractFloat}(X::Matrix{T}, κ::Kernel{T}, α::T = zero(T), ϵ
     K = kernelmatrix(κ, X)
     centerkernelmatrix!(K)
     α == 0 || regularize!(K, α, trace(K)/size(K,1))
-    ϵ == 0 || perturb!(K, ϵ)
+    ϵ == 0 || perturb!(K, ϵ*(n-1))
     V, Λ = components_eig!(K)
     (V, scale!(Λ, one(T)/(n-1)))
 end
