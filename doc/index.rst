@@ -10,3 +10,4 @@ dimensionality reduction.
     kfda
     kica
     mca
+    citations
