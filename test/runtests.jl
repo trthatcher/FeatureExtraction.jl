@@ -1,6 +1,8 @@
-using DataDecomposition
+using FeatureExtraction
 using MLKernels
 using Base.Test
+
+MOD = FeatureExtraction
 
 FloatingPointTypes = (Float32, Float64)
 

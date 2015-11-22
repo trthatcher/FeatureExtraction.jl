@@ -1,5 +1,3 @@
-MOD = DataDecomposition
-
 n = 20  # Number of observations
 p = 5   # Number of parameters
 

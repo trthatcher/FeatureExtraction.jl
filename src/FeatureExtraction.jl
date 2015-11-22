@@ -1,4 +1,4 @@
-module DataDecomposition
+module FeatureExtraction
 
 # package code goes here
 
