@@ -9,6 +9,6 @@ notifications:
   email: false
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("DataDecomposition"); Pkg.test("DataDecomposition"; coverage=true)'
+  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("FeatureExtraction"); Pkg.test("FeatureExtraction"; coverage=true)'
 after_success:
-  - julia -e 'cd(Pkg.dir("DataDecomposition")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(process_folder())'
+  - julia -e 'cd(Pkg.dir("FeatureExtraction")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(process_folder())'
