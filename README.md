@@ -1,7 +1,7 @@
 # Feature Extraction
 
 [![Build Status](https://travis-ci.org/trthatcher/FeatureExtraction.jl.svg?branch=master)](https://travis-ci.org/trthatcher/FeatureExtraction.jl)
-[![Coverage Status](https://coveralls.io/repos/trthatcher/DataDecomposition.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/trthatcher/DataDecomposition.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/trthatcher/FeatureExtraction.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/trthatcher/FeatureExtraction.jl?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/featureextraction/badge/?version=latest)](http://featureextraction.readthedocs.org/en/latest/?badge=latest)
 
 **FeatureExtraction.jl** is a Julia package that implements various solvers for
